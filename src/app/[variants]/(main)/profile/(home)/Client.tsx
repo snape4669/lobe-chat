@@ -11,10 +11,15 @@ import UserAvatar from '@/features/User/UserAvatar';
 import { useUserStore } from '@/store/user';
 import { authSelectors, userProfileSelectors } from '@/store/user/selectors';
 
+import SSOProvidersList from './features/SSOProvidersList';
+
 type SettingItemGroup = ItemGroup;
 
 const Client = memo<{ mobile?: boolean }>(() => {
-  const [isLoginWithNextAuth] = useUserStore((s) => [authSelectors.isLoginWithNextAuth(s)]);
+  const [isLoginWithNextAuth, isLogin] = useUserStore((s) => [
+    authSelectors.isLoginWithNextAuth(s),
+    authSelectors.isLogin(s),
+  ]);
   const [nickname, username, userProfile] = useUserStore((s) => [
     userProfileSelectors.nickName(s),
     userProfileSelectors.username(s),
@@ -27,7 +32,7 @@ const Client = memo<{ mobile?: boolean }>(() => {
   const profile: SettingItemGroup = {
     children: [
       {
-        children: enableAuth && isLoginWithNextAuth ? <UserAvatar /> : <AvatarWithUpload />,
+        children: enableAuth && !isLogin ? <UserAvatar /> : <AvatarWithUpload />,
         label: t('profile.avatar'),
         minWidth: undefined,
       },
@@ -40,6 +45,13 @@ const Client = memo<{ mobile?: boolean }>(() => {
         children: userProfile?.email || '--',
         hidden: !isLoginWithNextAuth || !userProfile?.email,
         label: t('profile.email'),
+        minWidth: undefined,
+      },
+      {
+        children: <SSOProvidersList />,
+        hidden: !isLoginWithNextAuth,
+        label: t('profile.sso.providers'),
+        layout: 'vertical',
         minWidth: undefined,
       },
     ],

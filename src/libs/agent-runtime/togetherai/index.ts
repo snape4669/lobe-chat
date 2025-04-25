@@ -1,9 +1,8 @@
+import type { ChatModelCard } from '@/types/llm';
+
 import { ModelProvider } from '../types';
 import { LobeOpenAICompatibleFactory } from '../utils/openaiCompatibleFactory';
 import { TogetherAIModel } from './type';
-
-import { LOBE_DEFAULT_MODEL_LIST } from '@/config/aiModels';
-import type { ChatModelCard } from '@/types/llm';
 
 export const LobeTogetherAI = LobeOpenAICompatibleFactory({
   baseURL: 'https://api.together.xyz/v1',
@@ -17,34 +16,44 @@ export const LobeTogetherAI = LobeOpenAICompatibleFactory({
     chatCompletion: () => process.env.DEBUG_TOGETHERAI_CHAT_COMPLETION === '1',
   },
   models: async ({ client }) => {
-    const visionKeywords = [
-      'qvq',
-      'vision',
-    ];
+    const { LOBE_DEFAULT_MODEL_LIST } = await import('@/config/aiModels');
 
-    const reasoningKeywords = [
-      'deepseek-r1',
-      'qwq',
-    ];
+    const visionKeywords = ['qvq', 'vision'];
+
+    const reasoningKeywords = ['deepseek-r1', 'qwq'];
 
     client.baseURL = 'https://api.together.xyz/api';
 
-    const modelsPage = await client.models.list() as any;
+    const modelsPage = (await client.models.list()) as any;
     const modelList: TogetherAIModel[] = modelsPage.body;
 
     return modelList
       .map((model) => {
+        const knownModel = LOBE_DEFAULT_MODEL_LIST.find(
+          (m) => model.id.toLowerCase() === m.id.toLowerCase(),
+        );
+
         return {
-          contextWindowTokens: LOBE_DEFAULT_MODEL_LIST.find((m) => model.name === m.id)?.contextWindowTokens ?? undefined,
+          contextWindowTokens: knownModel?.contextWindowTokens ?? undefined,
           description: model.description,
           displayName: model.display_name,
-          enabled: LOBE_DEFAULT_MODEL_LIST.find((m) => model.name === m.id)?.enabled || false,
-          functionCall: model.description?.toLowerCase().includes('function calling'),
-          id: model.name,
+          enabled: knownModel?.enabled || false,
+          functionCall:
+            model.description?.toLowerCase().includes('function calling') ||
+            knownModel?.abilities?.functionCall ||
+            false,
+          id: model.id,
           maxOutput: model.context_length,
-          reasoning: reasoningKeywords.some(keyword => model.name.toLowerCase().includes(keyword)),
+          reasoning:
+            reasoningKeywords.some((keyword) => model.id.toLowerCase().includes(keyword)) ||
+            knownModel?.abilities?.functionCall ||
+            false,
           tokens: model.context_length,
-          vision: model.description?.toLowerCase().includes('vision') || visionKeywords.some(keyword => model.name?.toLowerCase().includes(keyword)),
+          vision:
+            model.description?.toLowerCase().includes('vision') ||
+            visionKeywords.some((keyword) => model.id?.toLowerCase().includes(keyword)) ||
+            knownModel?.abilities?.functionCall ||
+            false,
         };
       })
       .filter(Boolean) as ChatModelCard[];

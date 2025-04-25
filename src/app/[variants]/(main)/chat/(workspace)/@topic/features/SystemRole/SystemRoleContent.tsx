@@ -4,7 +4,7 @@ import { ActionIcon } from '@lobehub/ui';
 import { EditableMessage } from '@lobehub/ui/chat';
 import { Skeleton } from 'antd';
 import { Edit } from 'lucide-react';
-import { memo, useState } from 'react';
+import { MouseEvent, memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Flexbox } from 'react-layout-kit';
 import useMergeState from 'use-merge-value';
@@ -24,14 +24,16 @@ import { useStyles } from './style';
 
 const SystemRole = memo(() => {
   const [editing, setEditing] = useState(false);
-  const { styles } = useStyles();
+  const { styles, cx } = useStyles();
   const openChatSettings = useOpenChatSettings(ChatSettingsTabs.Prompt);
-  const [init, meta] = useSessionStore((s) => [
+  const [init, meta, sessionId] = useSessionStore((s) => [
     sessionSelectors.isSomeSessionActive(s),
     sessionMetaSelectors.currentAgentMeta(s),
+    s.activeId,
   ]);
 
-  const [systemRole, updateAgentConfig] = useAgentStore((s) => [
+  const [isAgentConfigLoading, systemRole, updateAgentConfig] = useAgentStore((s) => [
+    agentSelectors.isAgentConfigLoading(s),
     agentSelectors.currentAgentSystemRole(s),
     s.updateAgentConfig,
   ]);
@@ -49,16 +51,29 @@ const SystemRole = memo(() => {
 
   const { t } = useTranslation('common');
 
-  const handleOpenWithEdit = () => {
-    if (!init) return;
+  const isLoading = !init || isAgentConfigLoading;
+
+  const handleOpenWithEdit = (e: MouseEvent) => {
+    if (isLoading) return;
+
+    e.stopPropagation();
     setEditing(true);
     setOpen(true);
   };
 
   const handleOpen = () => {
-    if (!init) return;
+    if (isLoading) return;
 
     setOpen(true);
+  };
+
+  const [expanded, toggleAgentSystemRoleExpand] = useGlobalStore((s) => [
+    systemStatusSelectors.getAgentSystemRoleExpanded(sessionId)(s),
+    s.toggleAgentSystemRoleExpand,
+  ]);
+
+  const toggleExpanded = () => {
+    toggleAgentSystemRoleExpand(sessionId);
   };
 
   return (
@@ -67,17 +82,24 @@ const SystemRole = memo(() => {
         actions={
           <ActionIcon icon={Edit} onClick={handleOpenWithEdit} size={'small'} title={t('edit')} />
         }
+        onClick={toggleExpanded}
+        style={{ cursor: 'pointer' }}
         title={t('settingAgent.prompt.title', { ns: 'setting' })}
       />
       <Flexbox
-        className={styles.promptBox}
-        height={200}
+        className={cx(styles.promptBox, styles.animatedContainer)}
+        height={expanded ? 200 : 0}
         onClick={handleOpen}
         onDoubleClick={(e) => {
-          if (e.altKey) handleOpenWithEdit();
+          if (e.altKey) handleOpenWithEdit(e);
+        }}
+        style={{
+          opacity: expanded ? 1 : 0,
+          overflow: 'hidden',
+          transition: 'height 0.3s ease',
         }}
       >
-        {!init ? (
+        {isLoading ? (
           <Skeleton
             active
             avatar={false}
